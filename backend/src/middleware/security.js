@@ -2,6 +2,8 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 const cors = require('cors');
+const { RateLimiterRedis } = require('rate-limiter-flexible');
+const { getRedisClient } = require('../config/redis');
 
 /**
  * Configure security middleware for the Express application
@@ -14,56 +16,138 @@ const configureSecurityMiddleware = (app) => {
   // Prevent XSS attacks
   app.use(xss());
 
-  // Enable CORS with specific options
+  // Enable CORS with allowlist-based configuration (P0 Security Fix)
+  // Parse comma-separated allowlist from environment
+  const allowedOrigins = (process.env.CORS_ALLOWLIST || '')
+    .split(',')
+    .map(o => o.trim())
+    .filter(Boolean);
+
   const corsOptions = {
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? process.env.ALLOWED_ORIGINS?.split(',') ||
-          'https://resolveit.eliff.tech'
-        : // : '*',
-          true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin(origin, callback) {
+      // Allow requests with no origin (mobile apps, Postman, etc.) in development
+      if (!origin && process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+
+      // Block requests with no origin in production
+      if (!origin) {
+        return callback(new Error('Origin header required'), false);
+      }
+
+      // Check if origin is in allowlist
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Reject origin not in allowlist
+      return callback(new Error('Not allowed by CORS policy'), false);
+    },
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
+    credentials: false, // Disabled - using Bearer tokens, no cookies needed
     maxAge: 86400, // 24 hours
   };
   app.use(cors(corsOptions));
   app.options('*', cors(corsOptions));
 
-  // Rate limiting for all API routes
-  const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
-    message: {
-      status: 'error',
-      message:
-        'Too many requests from this IP, please try again after 15 minutes',
-    },
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  });
-  app.use('/api', apiLimiter);
+  /**
+   * P1 Fix: Distributed rate limiting with Redis
+   * Falls back to in-memory rate limiting if Redis is unavailable
+   */
+  const redisClient = getRedisClient();
 
-  // More strict rate limiting for authentication routes
-  const authLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 10, // limit each IP to 10 login/register attempts per hour
-    message: {
-      status: 'error',
-      message:
-        'Too many authentication attempts, please try again after an hour',
-    },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-  app.use('/api/auth', authLimiter);
+  if (redisClient) {
+    // Redis-backed distributed rate limiting
+    console.log('Using Redis-backed distributed rate limiting');
 
-  // Add security headers
+    // API rate limiter (1000 requests per minute per IP)
+    const apiRateLimiter = new RateLimiterRedis({
+      storeClient: redisClient,
+      keyPrefix: 'rl_api',
+      points: 1000, // Number of requests
+      duration: 60, // Per 60 seconds
+      blockDuration: 60 * 15, // Block for 15 minutes if exceeded
+    });
+
+    // Auth rate limiter (10 requests per hour per IP)
+    const authRateLimiter = new RateLimiterRedis({
+      storeClient: redisClient,
+      keyPrefix: 'rl_auth',
+      points: 10,
+      duration: 60 * 60, // Per hour
+      blockDuration: 60 * 60, // Block for 1 hour if exceeded
+    });
+
+    // API rate limit middleware
+    app.use('/api', async (req, res, next) => {
+      // Skip rate limiting for health check endpoints
+      if (req.path === '/healthz' || req.path === '/readyz') {
+        return next();
+      }
+
+      try {
+        await apiRateLimiter.consume(req.ip);
+        next();
+      } catch (rejRes) {
+        res.status(429).json({
+          status: 'error',
+          message: 'Too many requests from this IP, please try again later',
+          retryAfter: Math.round(rejRes.msBeforeNext / 1000) || 60,
+        });
+      }
+    });
+
+    // Auth rate limit middleware
+    app.use('/api/auth', async (req, res, next) => {
+      try {
+        await authRateLimiter.consume(req.ip);
+        next();
+      } catch (rejRes) {
+        res.status(429).json({
+          status: 'error',
+          message: 'Too many authentication attempts, please try again after an hour',
+          retryAfter: Math.round(rejRes.msBeforeNext / 1000) || 3600,
+        });
+      }
+    });
+  } else {
+    // Fallback to in-memory rate limiting
+    console.warn('Redis unavailable. Using in-memory rate limiting (not suitable for production clusters)');
+
+    const apiLimiter = rateLimit({
+      windowMs: 60 * 1000, // 1 minute
+      max: 1000,
+      message: {
+        status: 'error',
+        message: 'Too many requests from this IP, please try again later',
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.path === '/api/healthz' || req.path === '/api/readyz',
+    });
+    app.use('/api', apiLimiter);
+
+    const authLimiter = rateLimit({
+      windowMs: 60 * 60 * 1000, // 1 hour
+      max: 10,
+      message: {
+        status: 'error',
+        message: 'Too many authentication attempts, please try again after an hour',
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
+    app.use('/api/auth', authLimiter);
+  }
+
+  // Add enhanced security headers (P2 Security Hardening)
   app.use((req, res, next) => {
-    // Content Security Policy
+    // Content Security Policy - Removed 'unsafe-inline' (P2 Fix)
+    // Note: Frontend may need nonce-based CSP for inline scripts
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none';"
+      "default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
     );
 
     // Prevent clickjacking
@@ -80,13 +164,13 @@ const configureSecurityMiddleware = (app) => {
     // Prevent MIME type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
 
-    // Referrer policy
-    res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
+    // Enhanced Referrer Policy (P2 Fix)
+    res.setHeader('Referrer-Policy', 'no-referrer');
 
-    // Feature policy
+    // Feature/Permissions Policy
     res.setHeader(
       'Permissions-Policy',
-      'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+      'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=()'
     );
 
     next();
