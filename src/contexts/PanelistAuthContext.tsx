@@ -1,14 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { PanelistUser, PanelistInfo } from '@/types/panelist/auth.types';
+import { authService } from '@/services/panelist/authService';
 
 interface PanelistAuthContextType {
   panelistUser: PanelistUser | null;
   panelistInfo: PanelistInfo | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (user: PanelistUser, panelist: PanelistInfo, token: string) => void;
-  logout: () => void;
+  login: (user: PanelistUser, panelist: PanelistInfo) => void;
+  logout: () => Promise<void>;
   updatePanelistInfo: (panelist: PanelistInfo) => void;
 }
 
@@ -17,58 +17,59 @@ const PanelistAuthContext = createContext<PanelistAuthContextType | undefined>(u
 export const PanelistAuthProvider = ({ children }: { children: ReactNode }) => {
   const [panelistUser, setPanelistUser] = useState<PanelistUser | null>(null);
   const [panelistInfo, setPanelistInfo] = useState<PanelistInfo | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth token on mount
-    const storedToken = localStorage.getItem('panelistAuthToken');
-    const storedUser = localStorage.getItem('panelistUser');
-    const storedPanelist = localStorage.getItem('panelistInfo');
+    // Check for stored user data on mount (non-sensitive data only)
+    // Session is validated by HttpOnly cookie on each API request
+    const storedUser = sessionStorage.getItem('panelistUser');
+    const storedPanelist = sessionStorage.getItem('panelistInfo');
 
-    if (storedToken && storedUser && storedPanelist) {
+    if (storedUser && storedPanelist) {
       try {
-        setToken(storedToken);
         setPanelistUser(JSON.parse(storedUser));
         setPanelistInfo(JSON.parse(storedPanelist));
       } catch (error) {
         console.error('Failed to parse stored auth data:', error);
-        localStorage.removeItem('panelistAuthToken');
-        localStorage.removeItem('panelistUser');
-        localStorage.removeItem('panelistInfo');
+        sessionStorage.removeItem('panelistUser');
+        sessionStorage.removeItem('panelistInfo');
       }
     }
     setIsLoading(false);
   }, []);
 
-  const login = (user: PanelistUser, panelist: PanelistInfo, authToken: string) => {
-    setToken(authToken);
+  const login = (user: PanelistUser, panelist: PanelistInfo) => {
     setPanelistUser(user);
     setPanelistInfo(panelist);
-    localStorage.setItem('panelistAuthToken', authToken);
-    localStorage.setItem('panelistUser', JSON.stringify(user));
-    localStorage.setItem('panelistInfo', JSON.stringify(panelist));
+    // Store non-sensitive user info in sessionStorage
+    sessionStorage.setItem('panelistUser', JSON.stringify(user));
+    sessionStorage.setItem('panelistInfo', JSON.stringify(panelist));
   };
 
-  const logout = () => {
-    setToken(null);
-    setPanelistUser(null);
-    setPanelistInfo(null);
-    localStorage.removeItem('panelistAuthToken');
-    localStorage.removeItem('panelistUser');
-    localStorage.removeItem('panelistInfo');
+  const logout = async () => {
+    try {
+      // Call backend to clear HttpOnly cookies
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local state regardless of API call result
+      setPanelistUser(null);
+      setPanelistInfo(null);
+      sessionStorage.removeItem('panelistUser');
+      sessionStorage.removeItem('panelistInfo');
+    }
   };
 
   const updatePanelistInfo = (panelist: PanelistInfo) => {
     setPanelistInfo(panelist);
-    localStorage.setItem('panelistInfo', JSON.stringify(panelist));
+    sessionStorage.setItem('panelistInfo', JSON.stringify(panelist));
   };
 
   const value = {
     panelistUser,
     panelistInfo,
-    token,
-    isAuthenticated: !!token && !!panelistUser,
+    isAuthenticated: !!panelistUser,
     isLoading,
     login,
     logout,

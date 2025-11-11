@@ -6,18 +6,24 @@ import { toast } from 'sonner';
 export const usePanelistMessages = (params: MessageListParams = {}) => {
   const queryClient = useQueryClient();
 
-  // Get messages list
+  // Get messages list with optimized refetch strategy
   const messagesQuery = useQuery({
     queryKey: ['panelist-messages', params],
     queryFn: () => messageService.getMessages(params),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Increased to 60 seconds (was 30)
+    refetchOnWindowFocus: true, // Refetch when user returns to tab
+    refetchIntervalInBackground: false, // Don't poll in background
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
-  // Get unread count
+  // Get unread count with optimized refetch strategy
   const unreadCountQuery = useQuery({
     queryKey: ['panelist-unread-count'],
     queryFn: () => messageService.getUnreadCount(),
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 60000, // Increased to 60 seconds (was 30)
+    refetchOnWindowFocus: true,
+    refetchIntervalInBackground: false,
+    staleTime: 30000,
   });
 
   // Send message mutation
@@ -77,11 +83,13 @@ export const usePanelistMessages = (params: MessageListParams = {}) => {
 export const usePanelistCaseMessages = (caseId: string) => {
   const queryClient = useQueryClient();
 
-  // Get case messages
+  // Get case messages with optimized refetch strategy
   const messagesQuery = useQuery({
     queryKey: ['panelist-case-messages', caseId],
     queryFn: () => messageService.getCaseMessages(caseId, { limit: 50 }),
     enabled: !!caseId,
+    refetchOnWindowFocus: true, // Refetch when user returns
+    staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
   return {

@@ -1,64 +1,56 @@
-import { apiRequest, API_CONFIG } from '@/lib/api';
-import { AdminLoginPayload, AdminRegisterPayload, AdminAuthResponse } from '@/types/admin.types';
+import http from '@/lib/http';
+import { API_CONFIG } from '@/lib/api';
+import { AdminLoginPayload, AdminRegisterPayload, AdminAuthResponse, AdminUser } from '@/types/admin.types';
 
 export const adminAuthService = {
   register: async (payload: AdminRegisterPayload): Promise<AdminAuthResponse> => {
-    const response = await apiRequest<AdminAuthResponse>(
+    const response = await http.post<AdminAuthResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.AUTH.REGISTER,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
+      payload
     );
 
-    // Store admin token separately from regular user token
-    if (response.data.token) {
-      localStorage.setItem('admin_auth_token', response.data.token);
-      localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+    // Store non-sensitive admin user info in sessionStorage
+    if (response.data.data.user) {
+      sessionStorage.setItem('admin_user', JSON.stringify(response.data.data.user));
     }
 
-    return response;
+    return response.data;
   },
 
   login: async (payload: AdminLoginPayload): Promise<AdminAuthResponse> => {
-    const response = await apiRequest<AdminAuthResponse>(
+    const response = await http.post<AdminAuthResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.AUTH.LOGIN,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
+      payload
     );
 
-    // Store admin token separately from regular user token
-    if (response.data.token) {
-      localStorage.setItem('admin_auth_token', response.data.token);
-      localStorage.setItem('admin_user', JSON.stringify(response.data.user));
+    // Store non-sensitive admin user info in sessionStorage
+    if (response.data.data.user) {
+      sessionStorage.setItem('admin_user', JSON.stringify(response.data.data.user));
     }
 
-    return response;
+    return response.data;
   },
 
-  logout: () => {
-    localStorage.removeItem('admin_auth_token');
-    localStorage.removeItem('admin_user');
+  logout: async (): Promise<void> => {
+    try {
+      // Call backend to clear HttpOnly cookies
+      await http.post('/api/admin/auth/logout');
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    } finally {
+      // Clear local state regardless of API call result
+      sessionStorage.removeItem('admin_user');
+    }
   },
 
-  getStoredToken: (): string | null => {
-    return localStorage.getItem('admin_auth_token');
-  },
-
-  getStoredUser: () => {
-    const user = localStorage.getItem('admin_user');
+  getStoredUser: (): AdminUser | null => {
+    const user = sessionStorage.getItem('admin_user');
     return user ? JSON.parse(user) : null;
   },
 
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('admin_auth_token');
+    // Check if user info exists in sessionStorage
+    // Actual auth is validated by HttpOnly cookie on each request
+    return !!sessionStorage.getItem('admin_user');
   },
 };
