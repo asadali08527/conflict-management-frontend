@@ -11,7 +11,7 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (firstName: string, lastName: string, email: string, phone: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   openAuthModal: (mode?: 'login' | 'register') => void;
   closeAuthModal: () => void;
   switchAuthMode: (mode: 'login' | 'register') => void;
@@ -49,8 +49,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         setUser(user);
-        localStorage.setItem('auth_token', response.data.token);
-        localStorage.setItem('user_info', JSON.stringify(user));
+        // Store user info in sessionStorage (non-sensitive data only)
+        sessionStorage.setItem('user_info', JSON.stringify(user));
         setIsAuthModalOpen(false);
       } else {
         throw new Error('Login failed');
@@ -80,8 +80,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         setUser(user);
-        localStorage.setItem('auth_token', response.data.token);
-        localStorage.setItem('user_info', JSON.stringify(user));
+        // Store user info in sessionStorage (non-sensitive data only)
+        sessionStorage.setItem('user_info', JSON.stringify(user));
         setIsAuthModalOpen(false);
       } else {
         throw new Error('Registration failed');
@@ -98,7 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Send the Google ID token to our backend
       const response = await authService.googleLogin(idToken);
-      
+
       if (response.status === 'success' && response.data) {
         const user: User = {
           ...response.data.user,
@@ -106,8 +106,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         };
 
         setUser(user);
-        localStorage.setItem('auth_token', response.data.token);
-        localStorage.setItem('user_info', JSON.stringify(user));
+        // Store user info in sessionStorage (non-sensitive data only)
+        sessionStorage.setItem('user_info', JSON.stringify(user));
         setIsAuthModalOpen(false);
       } else {
         throw new Error('Google login failed');
@@ -119,10 +119,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user_info');
-    localStorage.removeItem('auth_token');
+  const logout = async () => {
+    try {
+      // Call backend to clear HttpOnly cookies
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Clear local state regardless of API call result
+      setUser(null);
+      sessionStorage.removeItem('user_info');
+    }
   };
 
   const openAuthModal = (mode: 'login' | 'register' = 'login') => {
@@ -138,14 +145,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setAuthMode(mode);
   };
 
-  // Load user from localStorage on mount
+  // Load user from sessionStorage on mount (non-sensitive data only)
+  // Session is validated by HttpOnly cookie on each API request
   useEffect(() => {
-    const storedUser = localStorage.getItem('user_info');
+    const storedUser = sessionStorage.getItem('user_info');
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch (error) {
-        localStorage.removeItem('user_info');
+        sessionStorage.removeItem('user_info');
       }
     }
   }, []);

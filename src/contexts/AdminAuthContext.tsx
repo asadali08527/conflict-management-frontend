@@ -6,7 +6,7 @@ interface AdminAuthContextType {
   adminUser: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
   setAdminUser: (user: AdminUser | null) => void;
 }
 
@@ -40,8 +40,8 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(false);
   }, []);
 
-  const logout = () => {
-    adminAuthService.logout();
+  const logout = async () => {
+    await adminAuthService.logout();
     setAdminUser(null);
   };
 

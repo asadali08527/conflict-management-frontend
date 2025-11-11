@@ -13,8 +13,8 @@ export const usePanelistAuthQuery = () => {
     mutationFn: (payload: LoginPayload) => authService.login(payload),
     onSuccess: (response) => {
       if (response.status === 'success' && response.data) {
-        const { user, panelist, token } = response.data;
-        loginContext(user, panelist, token);
+        const { user, panelist } = response.data;
+        loginContext(user, panelist);
         toast.success('Login successful');
       }
     },
@@ -27,7 +27,7 @@ export const usePanelistAuthQuery = () => {
   const currentUserQuery = useQuery({
     queryKey: ['panelist-current-user'],
     queryFn: () => authService.getCurrentUser(),
-    enabled: !!localStorage.getItem('panelistAuthToken'),
+    enabled: !!sessionStorage.getItem('panelistUser'),
     retry: false,
   });
 
