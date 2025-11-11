@@ -43,7 +43,11 @@ const CaseFileSchema = new mongoose.Schema({
   }
 });
 
-// Index for efficient queries
-CaseFileSchema.index({ sessionId: 1 });
+/**
+ * P1 Performance Fix: Optimized indexes for file retrieval
+ * These indexes support efficient file lookups by session and date
+ */
+CaseFileSchema.index({ sessionId: 1, createdAt: -1 }); // Files by session sorted by date
+CaseFileSchema.index({ storageKey: 1 }); // Lookup by S3 key for deletions/updates
 
 module.exports = mongoose.model('CaseFile', CaseFileSchema);

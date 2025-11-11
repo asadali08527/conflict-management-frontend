@@ -111,12 +111,14 @@ const MessageSchema = new mongoose.Schema({
   }
 });
 
-// Indexes for efficient queries
-MessageSchema.index({ case: 1, createdAt: -1 });
-MessageSchema.index({ 'sender.userId': 1 });
-MessageSchema.index({ 'recipients.userId': 1 });
-MessageSchema.index({ 'recipients.isRead': 1 });
-MessageSchema.index({ isDeleted: 1 });
+/**
+ * P1 Performance Fix: Optimized indexes for hot query paths
+ * These indexes support message retrieval, unread counts, and filtering
+ */
+MessageSchema.index({ case: 1, createdAt: -1 }); // Messages for a case sorted by date
+MessageSchema.index({ 'sender.userId': 1 }); // Messages by sender
+MessageSchema.index({ 'recipients.userId': 1, 'recipients.isRead': 1, createdAt: -1 }); // P1: Compound index for unread messages
+MessageSchema.index({ isDeleted: 1 }); // Filter deleted messages
 
 // Update the updatedAt field before saving
 MessageSchema.pre('save', function(next) {

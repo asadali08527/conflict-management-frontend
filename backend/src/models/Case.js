@@ -190,4 +190,14 @@ CaseSchema.pre('save', function(next) {
   next();
 });
 
+/**
+ * P1 Performance Fix: Add compound indexes for hot query paths
+ * These indexes optimize common dashboard and filter queries
+ */
+CaseSchema.index({ createdBy: 1, createdAt: -1 }); // User's cases sorted by date
+CaseSchema.index({ status: 1, createdAt: -1 }); // Cases by status sorted by date
+CaseSchema.index({ type: 1, createdAt: -1 }); // Cases by type sorted by date
+CaseSchema.index({ assignedTo: 1, status: 1 }); // Assigned cases by status
+CaseSchema.index({ 'assignedPanelists.panelist': 1, 'assignedPanelists.status': 1 }); // Panelist assignments
+
 module.exports = mongoose.model('Case', CaseSchema);
