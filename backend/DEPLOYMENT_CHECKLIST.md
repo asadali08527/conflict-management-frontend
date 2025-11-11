@@ -93,8 +93,7 @@
 ### 2. Environment Variables
 Verify `.env` has:
 ```env
-AWS_ACCESS_KEY=AKIAS2A66JDHSXTOFGHS
-AWS_SECRET_ACCESS_KEY=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
+
 AWS_REGION=us-east-1
 AWS_S3_BUCKET_NAME=conflict-management-files
 ```
