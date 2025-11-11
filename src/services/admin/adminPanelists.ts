@@ -1,4 +1,5 @@
-import { apiRequest, API_CONFIG } from '@/lib/api';
+import http from '@/lib/http';
+import { API_CONFIG } from '@/lib/api';
 import {
   GetPanelistsParams,
   GetPanelistsResponse,
@@ -23,15 +24,6 @@ import {
   GetPanelistPerformanceResponse,
 } from '@/types/panelist.types';
 
-// Helper to get admin auth headers
-const getAdminAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('admin_auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
-
 export const adminPanelistsService = {
   /**
    * Get all panelists with pagination, filtering, and search
@@ -50,10 +42,8 @@ export const adminPanelistsService = {
 
     const endpoint = `${API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.LIST}?${queryParams.toString()}`;
 
-    return apiRequest<GetPanelistsResponse>(endpoint, {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-    });
+    const response = await http.get<GetPanelistsResponse>(endpoint);
+    return response.data;
   },
 
   /**
@@ -67,37 +57,29 @@ export const adminPanelistsService = {
 
     const endpoint = `${API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.AVAILABLE}?${queryParams.toString()}`;
 
-    return apiRequest<GetAvailablePanelistsResponse>(endpoint, {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-    });
+    const response = await http.get<GetAvailablePanelistsResponse>(endpoint);
+    return response.data;
   },
 
   /**
    * Get panelist by ID with details
    */
   getPanelistById: async (panelistId: string): Promise<GetPanelistResponse> => {
-    return apiRequest<GetPanelistResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.GET(panelistId),
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetPanelistResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.GET(panelistId)
     );
+    return response.data;
   },
 
   /**
    * Create a new panelist
    */
   createPanelist: async (payload: CreatePanelistPayload): Promise<CreatePanelistResponse> => {
-    return apiRequest<CreatePanelistResponse>(
+    const response = await http.post<CreatePanelistResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.CREATE,
-      {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -107,27 +89,21 @@ export const adminPanelistsService = {
     panelistId: string,
     payload: UpdatePanelistPayload
   ): Promise<UpdatePanelistResponse> => {
-    return apiRequest<UpdatePanelistResponse>(
+    const response = await http.patch<UpdatePanelistResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.UPDATE(panelistId),
-      {
-        method: 'PATCH',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
    * Deactivate a panelist
    */
   deactivatePanelist: async (panelistId: string): Promise<DeactivatePanelistResponse> => {
-    return apiRequest<DeactivatePanelistResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.DEACTIVATE(panelistId),
-      {
-        method: 'DELETE',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.delete<DeactivatePanelistResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.DEACTIVATE(panelistId)
     );
+    return response.data;
   },
 
   /**
@@ -147,10 +123,8 @@ export const adminPanelistsService = {
 
     const endpoint = `${API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.GET_CASES(panelistId)}?${queryParams.toString()}`;
 
-    return apiRequest<GetPanelistCasesResponse>(endpoint, {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-    });
+    const response = await http.get<GetPanelistCasesResponse>(endpoint);
+    return response.data;
   },
 
   /**
@@ -160,14 +134,11 @@ export const adminPanelistsService = {
     caseId: string,
     payload: AssignPanelPayload
   ): Promise<AssignPanelResponse> => {
-    return apiRequest<AssignPanelResponse>(
+    const response = await http.post<AssignPanelResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.ASSIGN_PANEL(caseId),
-      {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -177,39 +148,30 @@ export const adminPanelistsService = {
     caseId: string,
     panelistId: string
   ): Promise<RemovePanelistResponse> => {
-    return apiRequest<RemovePanelistResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.REMOVE_PANELIST(caseId, panelistId),
-      {
-        method: 'DELETE',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.delete<RemovePanelistResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.REMOVE_PANELIST(caseId, panelistId)
     );
+    return response.data;
   },
 
   /**
    * Get panelist statistics
    */
   getPanelistStatistics: async (): Promise<GetPanelStatisticsResponse> => {
-    return apiRequest<GetPanelStatisticsResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.STATISTICS,
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetPanelStatisticsResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.STATISTICS
     );
+    return response.data;
   },
 
   /**
    * Get panel statistics (dashboard)
    */
   getPanelStatistics: async (): Promise<GetPanelStatisticsResponse> => {
-    return apiRequest<GetPanelStatisticsResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANEL.STATISTICS,
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetPanelStatisticsResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANEL.STATISTICS
     );
+    return response.data;
   },
 
   /**
@@ -219,14 +181,11 @@ export const adminPanelistsService = {
     panelistId: string,
     payload: CreatePanelistAccountPayload
   ): Promise<CreatePanelistAccountResponse> => {
-    return apiRequest<CreatePanelistAccountResponse>(
+    const response = await http.post<CreatePanelistAccountResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.CREATE_ACCOUNT(panelistId),
-      {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -236,14 +195,11 @@ export const adminPanelistsService = {
     panelistId: string,
     payload: ResetPanelistPasswordPayload
   ): Promise<ResetPanelistPasswordResponse> => {
-    return apiRequest<ResetPanelistPasswordResponse>(
+    const response = await http.post<ResetPanelistPasswordResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.RESET_PASSWORD(panelistId),
-      {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -252,12 +208,9 @@ export const adminPanelistsService = {
   getPanelistPerformance: async (
     panelistId: string
   ): Promise<GetPanelistPerformanceResponse> => {
-    return apiRequest<GetPanelistPerformanceResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.PERFORMANCE(panelistId),
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetPanelistPerformanceResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.PANELISTS.PERFORMANCE(panelistId)
     );
+    return response.data;
   },
 };

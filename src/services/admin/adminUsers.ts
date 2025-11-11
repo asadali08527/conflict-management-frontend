@@ -1,19 +1,11 @@
-import { apiRequest, API_CONFIG } from '@/lib/api';
+import http from '@/lib/http';
+import { API_CONFIG } from '@/lib/api';
 import {
   GetUsersParams,
   GetUsersResponse,
   GetAdminsResponse,
   ToggleUserStatusResponse,
 } from '@/types/admin.types';
-
-// Helper to get admin auth headers
-const getAdminAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('admin_auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
 
 export const adminUsersService = {
   /**
@@ -32,35 +24,27 @@ export const adminUsersService = {
 
     const endpoint = `${API_CONFIG.ENDPOINTS.ADMIN.USERS.LIST}?${queryParams.toString()}`;
 
-    return apiRequest<GetUsersResponse>(endpoint, {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-    });
+    const response = await http.get<GetUsersResponse>(endpoint);
+    return response.data;
   },
 
   /**
    * Get all admin users with case statistics
    */
   getAdmins: async (): Promise<GetAdminsResponse> => {
-    return apiRequest<GetAdminsResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.USERS.ADMINS,
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetAdminsResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.USERS.ADMINS
     );
+    return response.data;
   },
 
   /**
    * Toggle user active status
    */
   toggleUserStatus: async (userId: string): Promise<ToggleUserStatusResponse> => {
-    return apiRequest<ToggleUserStatusResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.USERS.TOGGLE_STATUS(userId),
-      {
-        method: 'PATCH',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.patch<ToggleUserStatusResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.USERS.TOGGLE_STATUS(userId)
     );
+    return response.data;
   },
 };

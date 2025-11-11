@@ -1,4 +1,5 @@
-import { apiRequest, API_CONFIG } from '@/lib/api';
+import http from '@/lib/http';
+import { API_CONFIG } from '@/lib/api';
 import {
   ScheduleMeetingPayload,
   ScheduleMeetingResponse,
@@ -10,15 +11,6 @@ import {
   CancelMeetingPayload,
   CancelMeetingResponse,
 } from '@/types/admin.types';
-
-// Helper to get admin auth headers
-const getAdminAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('admin_auth_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-  };
-};
 
 export const adminMeetingsService = {
   /**
@@ -37,36 +29,28 @@ export const adminMeetingsService = {
 
     const endpoint = `${API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.LIST}?${queryParams.toString()}`;
 
-    return apiRequest<GetMeetingsResponse>(endpoint, {
-      method: 'GET',
-      headers: getAdminAuthHeaders(),
-    });
+    const response = await http.get<GetMeetingsResponse>(endpoint);
+    return response.data;
   },
 
   /**
    * Get a specific meeting by ID
    */
   getMeeting: async (meetingId: string): Promise<GetMeetingResponse> => {
-    return apiRequest<GetMeetingResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.GET(meetingId),
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetMeetingResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.GET(meetingId)
     );
+    return response.data;
   },
 
   /**
    * Get all meetings for a specific case
    */
   getCaseMeetings: async (caseId: string): Promise<GetMeetingsResponse> => {
-    return apiRequest<GetMeetingsResponse>(
-      API_CONFIG.ENDPOINTS.ADMIN.CASES.MEETINGS(caseId),
-      {
-        method: 'GET',
-        headers: getAdminAuthHeaders(),
-      }
+    const response = await http.get<GetMeetingsResponse>(
+      API_CONFIG.ENDPOINTS.ADMIN.CASES.MEETINGS(caseId)
     );
+    return response.data;
   },
 
   /**
@@ -75,14 +59,11 @@ export const adminMeetingsService = {
   scheduleMeeting: async (
     payload: ScheduleMeetingPayload
   ): Promise<ScheduleMeetingResponse> => {
-    return apiRequest<ScheduleMeetingResponse>(
+    const response = await http.post<ScheduleMeetingResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.CREATE,
-      {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -92,14 +73,11 @@ export const adminMeetingsService = {
     meetingId: string,
     payload: UpdateMeetingPayload
   ): Promise<UpdateMeetingResponse> => {
-    return apiRequest<UpdateMeetingResponse>(
+    const response = await http.patch<UpdateMeetingResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.UPDATE(meetingId),
-      {
-        method: 'PATCH',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload),
-      }
+      payload
     );
+    return response.data;
   },
 
   /**
@@ -109,13 +87,10 @@ export const adminMeetingsService = {
     meetingId: string,
     payload?: CancelMeetingPayload
   ): Promise<CancelMeetingResponse> => {
-    return apiRequest<CancelMeetingResponse>(
+    const response = await http.patch<CancelMeetingResponse>(
       API_CONFIG.ENDPOINTS.ADMIN.MEETINGS.CANCEL(meetingId),
-      {
-        method: 'PATCH',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify(payload || {}),
-      }
+      payload || {}
     );
+    return response.data;
   },
 };
